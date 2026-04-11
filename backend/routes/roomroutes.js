@@ -9,9 +9,19 @@ const generateMeetingId = () => {
 
 router.post("/create", async (req, res) => {
   try {
+    const { password } = req.body; // Receive password from frontend
+
+    if (!password) {
+      return res
+        .status(400)
+        .json({ message: "Password is required to create a room" });
+    }
+
     const customId = generateMeetingId();
-    const room = new Room({ _id: customId });
+    // Save the room with the password provided by the creator
+    const room = new Room({ _id: customId, password: password });
     await room.save();
+
     res.status(201).json({ roomId: room._id });
   } catch (err) {
     console.error(err);
@@ -21,9 +31,15 @@ router.post("/create", async (req, res) => {
 
 router.post("/join", async (req, res) => {
   try {
-    const { roomId, username } = req.body;
+    const { roomId, username, password } = req.body; // Receive password for verification
     const room = await Room.findById(roomId);
+
     if (!room) return res.status(404).json({ message: "Room not found" });
+
+    // VERIFICATION: Check if provided password matches the one in DB
+    if (room.password !== password) {
+      return res.status(401).json({ message: "Invalid room password" });
+    }
 
     if (room.users && !room.users.includes(username)) {
       room.users.push(username);

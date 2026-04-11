@@ -1,12 +1,13 @@
 const mongoose = require('mongoose');
 
 const roomSchema = new mongoose.Schema({
-  _id: { type: String }, // For the "000-000-000" ID
+  _id: { type: String, required: true }, // The "000-000-000" ID
   name: { type: String, default: "Collaborative Session" },
-  users: [String],
+  password: { type: String, required: true },
+  users: [String], // Array of usernames
   language: { type: String, default: "javascript" },
   lastCode: { type: String, default: "// Start coding here..." }
-});
+}, { timestamps: true });
 
-// This line is where most crashes happen
+// Check if model exists before creating to prevent "OverwriteModelError"
 module.exports = mongoose.models.Room || mongoose.model('Room', roomSchema);
