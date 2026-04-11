@@ -1,6 +1,30 @@
+# --- Dependencies ---
 node_modules/
+**/node_modules/
+
+# --- Security (CRITICAL) ---
+.env
+backend/.env
+frontend/.env
+*.pem
+*.key
+
+# --- Build & Production ---
 build/
 dist/
-.env
+frontend/build/
+frontend/dist/
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
 .pnp
 .pnp.js
+.vscode/

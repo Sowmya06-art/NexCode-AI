@@ -37,7 +37,7 @@ import "codemirror/mode/javascript/javascript";
 import "codemirror/mode/python/python";
 import "codemirror/mode/clike/clike";
 
-const socket = io("http://localhost:5000");
+const socket = io(process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
 
 function App() {
   const [roomId, setRoomId] = useState("");
@@ -262,7 +262,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/rooms/create",
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/rooms/create`,
         { password },
       );
       const id = response.data.roomId;
@@ -286,7 +286,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/rooms/join",
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/rooms/join`,
         { roomId, username, password },
       );
 
@@ -383,7 +383,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/ai/explain",
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/ai/explain`,
         {
           // 2. Send the content of the specific active file
           code: codeToExplain,
