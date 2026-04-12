@@ -38,8 +38,9 @@ import "codemirror/mode/python/python";
 import "codemirror/mode/clike/clike";
 
 const socket = io(process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
-const lastLocalChange = useRef(Date.now());
+
 function App() {
+  const lastLocalChange = useRef(0);
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
   const [username, setUsername] = useState("");
