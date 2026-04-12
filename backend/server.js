@@ -47,9 +47,9 @@ io.on("connection", (socket) => {
   });
 
   // 1. SYNC & SAVE CODE (Added fileName for multi-file support)
-  socket.on("code-change", async ({ roomId, code, fileName }) => {
+  socket.on("code-change", async ({ roomId, code, fileName,sender }) => {
     // Broadcast to others in the room
-    socket.to(roomId).emit("code-update", { code, fileName });
+    socket.to(roomId).emit("code-update", { code, fileName,sender });
 
     // Save specific file content to DB
     try {
