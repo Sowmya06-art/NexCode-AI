@@ -38,7 +38,7 @@ import "codemirror/mode/python/python";
 import "codemirror/mode/clike/clike";
 
 const socket = io(process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
-
+const lastLocalChange = useRef(Date.now());
 function App() {
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
@@ -170,20 +170,34 @@ function App() {
     });
 
     socket.on("code-update", ({ code, fileName }) => {
-      // 1. Update the background files array immediately
-      setFiles((prev) =>
-        prev.map((f) => (f.name === fileName ? { ...f, content: code } : f)),
-      );
+      // 1. LATENCY CHECK: If I typed in the last 150ms, ignore the server update.
+      // This prevents the server from overwriting my fresh typing with "old" data.
+      if (Date.now() - lastLocalChange.current < 150) return;
 
-      // 2. ONLY update the editor if this code update is for the file I am LOOKING at
-      if (
-        activeFileName === fileName &&
-        editorRef.current &&
-        code !== editorRef.current.getValue()
-      ) {
-        const cursor = editorRef.current.getCursor();
-        editorRef.current.setValue(code);
-        editorRef.current.setCursor(cursor);
+      if (activeFileName === fileName && editorRef.current) {
+        const currentCode = editorRef.current.getValue();
+
+        if (code !== currentCode) {
+          const cursor = editorRef.current.getCursor();
+
+          // Update editor directly
+          editorRef.current.setValue(code);
+          editorRef.current.setCursor(cursor);
+
+          // Background state update
+          setTimeout(() => {
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.name === fileName ? { ...f, content: code } : f,
+              ),
+            );
+          }, 0);
+        }
+      } else {
+        // If we aren't looking at the file, just update background state
+        setFiles((prev) =>
+          prev.map((f) => (f.name === fileName ? { ...f, content: code } : f)),
+        );
       }
     });
 
@@ -1193,6 +1207,9 @@ function App() {
               }}
               onChange={(editor, data, value) => {
                 if (data.origin !== "setValue") {
+                  // 1. Update the timestamp - I just typed!
+                  lastLocalChange.current = Date.now();
+
                   setFiles((prev) =>
                     prev.map((f) =>
                       f.name === activeFileName ? { ...f, content: value } : f,
