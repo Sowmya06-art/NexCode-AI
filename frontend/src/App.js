@@ -174,7 +174,7 @@ function App() {
       if (sender === socket.id) return;
       // 1. LATENCY CHECK: If I typed in the last 150ms, ignore the server update.
       // This prevents the server from overwriting my fresh typing with "old" data.
-      if (Date.now() - lastLocalChange.current < 500) return;
+      if (Date.now() - lastLocalChange.current < 1000) return;
 
       if (activeFileName === fileName && editorRef.current) {
         const currentCode = editorRef.current.getValue();
