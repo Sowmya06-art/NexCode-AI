@@ -8,6 +8,7 @@ const connectDB = require("./config/db");
 const Room = require("./models/Room");
 const roomRoutes = require("./routes/roomroutes");
 const aiRoutes = require("./routes/airoutes");
+const compileRoutes = require("./routes/compileroutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -21,6 +22,7 @@ app.use(express.json());
 
 app.use("/api/rooms", roomRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/compile", compileRoutes);
 
 // --- ALL SOCKET LOGIC MUST STAY INSIDE THIS BLOCK ---
 io.on("connection", (socket) => {

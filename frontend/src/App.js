@@ -71,10 +71,34 @@ function App() {
     },
   ]);
 
+  const activeFileNameRef = useRef(activeFileName);
+
+  useEffect(() => {
+    activeFileNameRef.current = activeFileName;
+  }, [activeFileName]);
+
+  useEffect(() => {
+    if (editorRef.current) {
+      const currentFile = files.find((f) => f.name === activeFileName);
+      if (currentFile) {
+        // Only update if the text is actually different to prevent cursor jumping
+        if (editorRef.current.getValue() !== currentFile.content) {
+          editorRef.current.setValue(currentFile.content);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFileName]);
+
   // 1. Update handleCreateFile
   const handleCreateFile = () => {
     const name = prompt("File name (e.g. index.py):");
     if (name) {
+      if (files.some((f) => f.name === name)) {
+        alert("A file with this name already exists.");
+        return;
+      }
+
       const newLang = detectLanguage(name);
       const newFile = { name, content: "", language: newLang };
       const updatedFiles = [...files, newFile];
@@ -95,7 +119,9 @@ function App() {
       const updatedFiles = files.filter((f) => f.name !== fileName);
       setFiles(updatedFiles);
       if (activeFileName === fileName) {
-        setActiveFileName(updatedFiles[0].name);
+        const fallbackFile = updatedFiles[0].name;
+        setActiveFileName(fallbackFile);
+        setLanguage(detectLanguage(fallbackFile));
       }
 
       // SYNC: Tell others a file was deleted
@@ -107,6 +133,11 @@ function App() {
   const handleRenameFile = (oldName) => {
     const newName = prompt("Enter new file name:", oldName);
     if (newName && newName !== oldName) {
+      if (files.some((f) => f.name === newName)) {
+        alert("A file with this name already exists.");
+        return;
+      }
+
       const updatedFiles = files.map((f) =>
         f.name === oldName
           ? { ...f, name: newName, language: detectLanguage(newName) }
@@ -114,6 +145,7 @@ function App() {
       );
       setFiles(updatedFiles);
       setActiveFileName(newName);
+      setLanguage(detectLanguage(newName));
 
       // SYNC: Tell others a file was renamed
       socket.emit("file-structure-update", { roomId, files: updatedFiles });
@@ -174,9 +206,9 @@ function App() {
       if (sender === socket.id) return;
       // 1. LATENCY CHECK: If I typed in the last 150ms, ignore the server update.
       // This prevents the server from overwriting my fresh typing with "old" data.
-      if (Date.now() - lastLocalChange.current < 1000) return;
+      if (Date.now() - lastLocalChange.current < 150) return;
 
-      if (activeFileName === fileName && editorRef.current) {
+      if (activeFileNameRef.current === fileName && editorRef.current) {
         const currentCode = editorRef.current.getValue();
 
         if (code !== currentCode) {
@@ -214,7 +246,7 @@ function App() {
       socket.off("language-update");
     };
     // FIX: Add activeFileName to this dependency array!
-  }, [roomId, activeFileName]);
+  }, [roomId]);
 
   useEffect(() => {
     socket.on("user-list-update", (users) => {
@@ -309,6 +341,12 @@ function App() {
       // Successful Join logic
       setJoined(true);
       if (response.data.language) setLanguage(response.data.language);
+
+      if (response.data.files && response.data.files.length > 0) {
+        setFiles(response.data.files);
+        setActiveFileName(response.data.files[0].name);
+      }
+
       socket.emit("join-room", { roomId, username });
 
       // Trigger the toast AFTER joining
@@ -339,47 +377,42 @@ function App() {
 
     setOutput("🚀 NexCode is compiling " + activeFile.name + "...");
 
-    // 2. Map your CodeMirror modes to the Piston API language IDs
+    // 2. Map your current active file to a language for the backend
+    // This helps the backend route it to OneCompiler correctly
+    const detectedExt = activeFile.name.split(".").pop();
     const langMap = {
-      "text/x-csrc": "c",
-      python: "python",
-      javascript: "javascript",
-      "text/x-java": "java",
-      "text/x-c++src": "cpp",
-      "text/typescript": "typescript",
-      "text/x-rustsrc": "rust",
-      "text/x-go": "go",
-      "text/x-csharp": "csharp",
+      js: "javascript",
+      py: "python",
+      java: "java",
+      cpp: "cpp",
+      csharp: "csharp",
+      c: "c",
     };
-
-    // Detect the language based on the active file name
-    const currentLang = langMap[detectLanguage(activeFile.name)];
+    const currentLang = langMap[detectedExt] || "javascript";
 
     try {
+      // REDIRECT: Pointing to your local backend route we created earlier
       const response = await axios.post(
-        "https://emkc.org/api/v2/piston/execute",
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/compile/execute`,
         {
+          code: activeFile.content,
           language: currentLang,
-          version: "*", // Uses the latest stable version
-          files: [{ content: activeFile.content }],
-          stdin: stdin, // Includes any user input from your terminal textarea
+          stdin: stdin, // Includes user input from your terminal textarea
         },
       );
 
-      // 3. Display output or errors in your terminal area
-      setOutput(
-        response.data.run.output ||
-          response.data.run.stderr ||
-          "✅ Execution finished with no output.",
-      );
+      // 3. Display output or errors from OneCompiler
+      const { stdout, stderr, compile_output } = response.data;
+
+      if (stderr || compile_output) {
+        setOutput((stderr || "") + "\n" + (compile_output || ""));
+      } else {
+        setOutput(stdout || "✅ Execution finished with no output.");
+      }
     } catch (error) {
-      console.error(
-        "Piston API Error:",
-        error.response ? error.response.data : error.message,
-      );
+      console.error("Execution Error:", error);
       setOutput(
-        "❌ Compiler Error: " +
-          (error.response?.data?.message || "Check Console"),
+        "❌ Server Error: Make sure your backend is running on port 5000.",
       );
     }
   };
@@ -419,8 +452,8 @@ function App() {
 
   const myMeeting = async (element) => {
     if (!element || !roomId) return;
-    const appID = 1535846009;
-    const serverSecret = "b53e9592639c26f7bdd576c43786a344";
+    const appID = Number(process.env.REACT_APP_ZEGO_APP_ID);
+    const serverSecret = process.env.REACT_APP_ZEGO_SERVER_SECRET;
     const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
       appID,
       serverSecret,
@@ -1221,7 +1254,7 @@ function App() {
                     roomId,
                     code: value,
                     fileName: activeFileName,
-                    sender: socket.id
+                    sender: socket.id,
                   });
                 }
               }}

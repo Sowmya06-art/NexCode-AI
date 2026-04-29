@@ -19,7 +19,17 @@ router.post("/create", async (req, res) => {
 
     const customId = generateMeetingId();
     // Save the room with the password provided by the creator
-    const room = new Room({ _id: customId, password: password });
+    const room = new Room({
+      _id: customId,
+      password: password,
+      files: [
+        {
+          name: "main.js",
+          content: "// Welcome to NexCode",
+          language: "javascript",
+        },
+      ],
+    });
     await room.save();
 
     res.status(201).json({ roomId: room._id });
@@ -51,6 +61,7 @@ router.post("/join", async (req, res) => {
       users: room.users,
       lastCode: room.lastCode,
       language: room.language,
+      files: room.files,
     });
   } catch (err) {
     res.status(500).json({ message: "Server Error" });
