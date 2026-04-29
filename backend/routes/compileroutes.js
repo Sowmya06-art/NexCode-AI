@@ -15,6 +15,15 @@ router.post("/execute", async (req, res) => {
     csharp: "csharp",
   };
 
+  const extMap = {
+    java: "java",
+    python: "py",
+    javascript: "js",
+    cpp: "cpp",
+    c: "c",
+    csharp: "cs",
+  };
+
   const selectedLang = langMap[language.toLowerCase()] || "javascript";
   const fileExtension = extMap[selectedLang] || "txt";
 

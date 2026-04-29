@@ -412,7 +412,7 @@ function App() {
     } catch (error) {
       console.error("Execution Error:", error);
       setOutput(
-        "❌ Server Error: Make sure your backend is running on port 5000.",
+        "❌ Server Error: Make sure your backend is running on port 10000.",
       );
     }
   };
