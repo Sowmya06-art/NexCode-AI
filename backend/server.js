@@ -9,11 +9,14 @@ const Room = require("./models/Room");
 const roomRoutes = require("./routes/roomroutes");
 const aiRoutes = require("./routes/airoutes");
 const compileRoutes = require("./routes/compileroutes");
+const zegoRoutes = require("./routes/zegoroutes");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 const roomUsers = {};
+
+const saveTimeouts = {};
 
 connectDB();
 
@@ -23,48 +26,70 @@ app.use(express.json());
 app.use("/api/rooms", roomRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/compile", compileRoutes);
+app.use("/api/zego", zegoRoutes);
 
 // --- ALL SOCKET LOGIC MUST STAY INSIDE THIS BLOCK ---
 io.on("connection", (socket) => {
   console.log("⚡ New user connected:", socket.id);
 
+
   socket.on("join-room", ({ roomId, username }) => {
     socket.join(roomId);
 
+    // FIX 1: Save these to the socket so disconnect can use them
+    socket.roomId = roomId;
+    socket.username = username;
+    
     if (!roomUsers[roomId]) roomUsers[roomId] = [];
     if (username && !roomUsers[roomId].includes(username)) {
       roomUsers[roomId].push(username);
     }
 
     io.to(roomId).emit("user-list-update", roomUsers[roomId]);
+  }); // <-- join-room block safely ends here
 
-    socket.on("disconnect", () => {
-      if (roomUsers[roomId]) {
-        roomUsers[roomId] = roomUsers[roomId].filter(
-          (user) => user !== username,
-        );
-        io.to(roomId).emit("user-list-update", roomUsers[roomId]);
+  // FIX 2: Disconnect is now outside of join-room
+  socket.on("disconnect", () => {
+    const { roomId, username } = socket;
+    
+    if (roomId && username && roomUsers[roomId]) {
+      roomUsers[roomId] = roomUsers[roomId].filter(
+        (user) => user !== username,
+      );
+      io.to(roomId).emit("user-list-update", roomUsers[roomId]);
+      
+      // Clean up the room array if everyone leaves
+      if (roomUsers[roomId].length === 0) {
+        delete roomUsers[roomId];
       }
-    });
+    }
   });
 
   // 1. SYNC & SAVE CODE (Added fileName for multi-file support)
-  socket.on("code-change", async ({ roomId, code, fileName,sender }) => {
-    // Broadcast to others in the room
-    socket.to(roomId).emit("code-update", { code, fileName,sender });
+  socket.on("code-change", async ({ roomId, code, fileName, sender }) => {
+    // Instantly broadcast to others in the room so it feels real-time
+    socket.to(roomId).emit("code-update", { code, fileName, sender });
 
-    // Save specific file content to DB
-    try {
-      const room = await Room.findById(roomId);
-      if (room && room.files) {
-        const updatedFiles = room.files.map((f) =>
-          f.name === fileName ? { ...f, content: code } : f,
-        );
-        await Room.findByIdAndUpdate(roomId, { files: updatedFiles });
-      }
-    } catch (err) {
-      console.error("Database save error:", err);
+    // Cancel the previous save timer if the user is still typing
+    if (saveTimeouts[roomId]) {
+      clearTimeout(saveTimeouts[roomId]);
     }
+
+    // Set a new timer to save to the database ONLY after 2 seconds of silence
+    saveTimeouts[roomId] = setTimeout(async () => {
+      try {
+        const room = await Room.findById(roomId);
+        if (room && room.files) {
+          const updatedFiles = room.files.map((f) =>
+            f.name === fileName ? { ...f, content: code } : f,
+          );
+          await Room.findByIdAndUpdate(roomId, { files: updatedFiles });
+          console.log(`Auto-saved ${fileName} to database.`); // Optional: helps you see it working!
+        }
+      } catch (err) {
+        console.error("Database save error:", err);
+      }
+    }, 2000); // 2000 ms = 2 seconds
   });
 
   // 2. SYNC FILE STRUCTURE (Creation, Deletion, Renaming)

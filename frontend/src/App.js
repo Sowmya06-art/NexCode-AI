@@ -9,6 +9,7 @@ import {
   materialDark,
   oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
+
 import {
   Sun,
   Moon,
@@ -35,7 +36,6 @@ import "codemirror/theme/material.css";
 import "codemirror/theme/neo.css";
 import "codemirror/mode/javascript/javascript";
 import "codemirror/mode/python/python";
-import "codemirror/mode/clike/clike";
 
 const socket = io(process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
 
@@ -452,21 +452,34 @@ function App() {
 
   const myMeeting = async (element) => {
     if (!element || !roomId) return;
-    const appID = Number(process.env.REACT_APP_ZEGO_APP_ID);
-    const serverSecret = process.env.REACT_APP_ZEGO_SERVER_SECRET;
-    const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
-      appID,
-      serverSecret,
-      roomId,
-      Date.now().toString(),
-      "User-" + Math.floor(Math.random() * 100),
-    );
-    const zp = ZegoUIKitPrebuilt.create(kitToken);
-    zp.joinRoom({
-      container: element,
-      scenario: { mode: ZegoUIKitPrebuilt.VideoConference },
-      showScreenSharingButton: true,
-    });
+
+    try {
+      // 1. Ask the backend for a secure token
+      // We pass the roomId and the username so the backend can encode them
+      const response = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/zego/get-token`,
+        { 
+          params: { 
+            roomId: roomId, 
+            userId: username || "User-" + Math.floor(Math.random() * 100) 
+          } 
+        }
+      );
+      
+      const { token } = response.data;
+
+      // 2. Initialize Zego using the secure token from the server
+      const zp = ZegoUIKitPrebuilt.create(token);
+      zp.joinRoom({
+        container: element,
+        scenario: { mode: ZegoUIKitPrebuilt.VideoConference },
+        showScreenSharingButton: true,
+      });
+
+    } catch (error) {
+      console.error("Zego Token Error:", error);
+      alert("⚠️ Could not connect to the secure video server.");
+    }
   };
 
   if (!joined) {
@@ -1473,6 +1486,7 @@ function App() {
           }}
         />
       )}
+     
     </div>
   );
 }

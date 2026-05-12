@@ -19,7 +19,7 @@ router.post('/explain', async (req, res) => {
         \n\n ${code}`;
 
         const result = await model.generateContent(prompt);
-        const response = await result.response;
+        const response = result.response;
         res.json({ explanation: response.text() });
     } catch (error) {
         console.error("Gemini Error:", error.message);
