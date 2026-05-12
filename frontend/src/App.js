@@ -37,7 +37,7 @@ import "codemirror/theme/neo.css";
 import "codemirror/mode/javascript/javascript";
 import "codemirror/mode/python/python";
 
-const socket = io(process.env.REACT_APP_BACKEND_URL || "http://localhost:5000");
+const socket = io(process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000");
 
 function App() {
   const lastLocalChange = useRef(0);
@@ -203,37 +203,29 @@ function App() {
     });
 
     socket.on("code-update", ({ code, fileName, sender }) => {
-      if (sender === socket.id) return;
-      // 1. LATENCY CHECK: If I typed in the last 150ms, ignore the server update.
-      // This prevents the server from overwriting my fresh typing with "old" data.
-      if (Date.now() - lastLocalChange.current < 150) return;
+    // 1. Safety: Don't process our own typing
+    if (sender === socket.id) return;
 
-      if (activeFileNameRef.current === fileName && editorRef.current) {
-        const currentCode = editorRef.current.getValue();
+    // 2. Latency check: If I am currently typing, ignore incoming old data
+    if (Date.now() - lastLocalChange.current < 150) return;
 
-        if (code !== currentCode) {
-          const cursor = editorRef.current.getCursor();
+    // 3. Update the global files state so background files stay in sync
+    setFiles((prev) =>
+      prev.map((f) => (f.name === fileName ? { ...f, content: code } : f))
+    );
 
-          // Update editor directly
-          editorRef.current.setValue(code);
-          editorRef.current.setCursor(cursor);
-
-          // Background state update
-          setTimeout(() => {
-            setFiles((prev) =>
-              prev.map((f) =>
-                f.name === fileName ? { ...f, content: code } : f,
-              ),
-            );
-          }, 0);
-        }
-      } else {
-        // If we aren't looking at the file, just update background state
-        setFiles((prev) =>
-          prev.map((f) => (f.name === fileName ? { ...f, content: code } : f)),
-        );
+    // 4. Update the actual CodeMirror instance ONLY if it's the file we are looking at
+    if (activeFileNameRef.current === fileName && editorRef.current) {
+      const currentEditorValue = editorRef.current.getValue();
+      
+      if (code !== currentEditorValue) {
+        // Save cursor position to prevent jumping
+        const cursor = editorRef.current.getCursor();
+        editorRef.current.setValue(code);
+        editorRef.current.setCursor(cursor);
       }
-    });
+    }
+  });
 
     socket.on("language-update", (newLang) => {
       setLanguage(newLang);
@@ -310,7 +302,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/rooms/create`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/rooms/create`,
         { password },
       );
       const id = response.data.roomId;
@@ -334,7 +326,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/rooms/join`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/rooms/join`,
         { roomId, username, password },
       );
 
@@ -393,7 +385,7 @@ function App() {
     try {
       // REDIRECT: Pointing to your local backend route we created earlier
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/compile/execute`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/compile/execute`,
         {
           code: activeFile.content,
           language: currentLang,
@@ -432,7 +424,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/ai/explain`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/ai/explain`,
         {
           // 2. Send the content of the specific active file
           code: codeToExplain,
@@ -457,7 +449,7 @@ function App() {
       // 1. Ask the backend for a secure token
       // We pass the roomId and the username so the backend can encode them
       const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"}/api/zego/get-token`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/zego/get-token`,
         { 
           params: { 
             roomId: roomId, 

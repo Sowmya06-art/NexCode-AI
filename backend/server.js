@@ -65,32 +65,33 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 1. SYNC & SAVE CODE (Added fileName for multi-file support)
-  socket.on("code-change", async ({ roomId, code, fileName, sender }) => {
-    // Instantly broadcast to others in the room so it feels real-time
-    socket.to(roomId).emit("code-update", { code, fileName, sender });
-
-    // Cancel the previous save timer if the user is still typing
-    if (saveTimeouts[roomId]) {
-      clearTimeout(saveTimeouts[roomId]);
-    }
-
-    // Set a new timer to save to the database ONLY after 2 seconds of silence
-    saveTimeouts[roomId] = setTimeout(async () => {
-      try {
-        const room = await Room.findById(roomId);
-        if (room && room.files) {
-          const updatedFiles = room.files.map((f) =>
-            f.name === fileName ? { ...f, content: code } : f,
-          );
-          await Room.findByIdAndUpdate(roomId, { files: updatedFiles });
-          console.log(`Auto-saved ${fileName} to database.`); // Optional: helps you see it working!
-        }
-      } catch (err) {
-        console.error("Database save error:", err);
-      }
-    }, 2000); // 2000 ms = 2 seconds
+ // 1. SYNC & SAVE CODE
+socket.on("code-change", async ({ roomId, code, fileName }) => {
+  // Use socket.id to tell the frontend who sent the change
+  socket.to(roomId).emit("code-update", { 
+    code, 
+    fileName, 
+    sender: socket.id 
   });
+
+  // --- Your existing Debounced Save Logic ---
+  if (saveTimeouts[roomId]) clearTimeout(saveTimeouts[roomId]);
+
+  saveTimeouts[roomId] = setTimeout(async () => {
+    try {
+      const room = await Room.findById(roomId);
+      if (room && room.files) {
+        const updatedFiles = room.files.map((f) =>
+          f.name === fileName ? { ...f, content: code } : f
+        );
+        await Room.findByIdAndUpdate(roomId, { files: updatedFiles });
+        console.log(`Auto-saved ${fileName} to DB.`);
+      }
+    } catch (err) {
+      console.error("Database save error:", err);
+    }
+  }, 2000);
+});
 
   // 2. SYNC FILE STRUCTURE (Creation, Deletion, Renaming)
   socket.on("file-structure-update", async ({ roomId, files }) => {
@@ -113,5 +114,5 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT ||  10000 || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
