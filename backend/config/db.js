@@ -1,3 +1,5 @@
+// db.js
+
 const mongoose = require('mongoose');
 // We don't need to require('dotenv') here if you've already required it in server.js,
 // but adding it ensures the MONGO_URI is found.

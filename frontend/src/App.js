@@ -1,3 +1,5 @@
+// App.js
+
 import React, { useState, useEffect, useRef } from "react";
 import { UnControlled as CodeMirror } from "react-codemirror2";
 import io from "socket.io-client";
@@ -37,8 +39,6 @@ import "codemirror/theme/neo.css";
 import "codemirror/mode/javascript/javascript";
 import "codemirror/mode/python/python";
 
-const socket = io(process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000");
-
 function App() {
   const lastLocalChange = useRef(0);
   const [roomId, setRoomId] = useState("");
@@ -63,6 +63,9 @@ function App() {
 
   const editorRef = useRef(null);
   const outputRef = useRef(null);
+  const socket = useRef(
+    io(process.env.REACT_APP_BACKEND_URL || "http://localhost:10000"),
+  ).current;
   const [files, setFiles] = useState([
     {
       name: "main.js",
@@ -203,29 +206,29 @@ function App() {
     });
 
     socket.on("code-update", ({ code, fileName, sender }) => {
-    // 1. Safety: Don't process our own typing
-    if (sender === socket.id) return;
+      // 1. Safety: Don't process our own typing
+      if (sender === socket.id) return;
 
-    // 2. Latency check: If I am currently typing, ignore incoming old data
-    if (Date.now() - lastLocalChange.current < 150) return;
+      // 2. Latency check: If I am currently typing, ignore incoming old data
+      if (Date.now() - lastLocalChange.current < 150) return;
 
-    // 3. Update the global files state so background files stay in sync
-    setFiles((prev) =>
-      prev.map((f) => (f.name === fileName ? { ...f, content: code } : f))
-    );
+      // 3. Update the global files state so background files stay in sync
+      setFiles((prev) =>
+        prev.map((f) => (f.name === fileName ? { ...f, content: code } : f)),
+      );
 
-    // 4. Update the actual CodeMirror instance ONLY if it's the file we are looking at
-    if (activeFileNameRef.current === fileName && editorRef.current) {
-      const currentEditorValue = editorRef.current.getValue();
-      
-      if (code !== currentEditorValue) {
-        // Save cursor position to prevent jumping
-        const cursor = editorRef.current.getCursor();
-        editorRef.current.setValue(code);
-        editorRef.current.setCursor(cursor);
+      // 4. Update the actual CodeMirror instance ONLY if it's the file we are looking at
+      if (activeFileNameRef.current === fileName && editorRef.current) {
+        const currentEditorValue = editorRef.current.getValue();
+
+        if (code !== currentEditorValue) {
+          // Save cursor position to prevent jumping
+          const cursor = editorRef.current.getCursor();
+          editorRef.current.setValue(code);
+          editorRef.current.setCursor(cursor);
+        }
       }
-    }
-  });
+    });
 
     socket.on("language-update", (newLang) => {
       setLanguage(newLang);
@@ -237,14 +240,15 @@ function App() {
       socket.off("code-update");
       socket.off("language-update");
     };
-    // FIX: Add activeFileName to this dependency array!
-  }, [roomId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, activeFileName]);
 
   useEffect(() => {
     socket.on("user-list-update", (users) => {
       setRoomUsers(users);
     });
     return () => socket.off("user-list-update");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLanguageChange = (newLang) => {
@@ -302,7 +306,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/rooms/create`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:10000"}/api/rooms/create`,
         { password },
       );
       const id = response.data.roomId;
@@ -326,7 +330,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/rooms/join`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:10000"}/api/rooms/join`,
         { roomId, username, password },
       );
 
@@ -385,7 +389,7 @@ function App() {
     try {
       // REDIRECT: Pointing to your local backend route we created earlier
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/compile/execute`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:10000"}/api/compile/execute`,
         {
           code: activeFile.content,
           language: currentLang,
@@ -424,7 +428,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/ai/explain`,
+        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:10000"}/api/ai/explain`,
         {
           // 2. Send the content of the specific active file
           code: codeToExplain,
@@ -443,36 +447,35 @@ function App() {
   };
 
   const myMeeting = async (element) => {
-    if (!element || !roomId) return;
-
-    try {
-      // 1. Ask the backend for a secure token
-      // We pass the roomId and the username so the backend can encode them
-      const response = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL || "http://localhost:5000" || "http://localhost:10000"}/api/zego/get-token`,
-        { 
-          params: { 
-            roomId: roomId, 
-            userId: username || "User-" + Math.floor(Math.random() * 100) 
-          } 
-        }
-      );
-      
-      const { token } = response.data;
-
-      // 2. Initialize Zego using the secure token from the server
-      const zp = ZegoUIKitPrebuilt.create(token);
-      zp.joinRoom({
-        container: element,
-        scenario: { mode: ZegoUIKitPrebuilt.VideoConference },
-        showScreenSharingButton: true,
-      });
-
-    } catch (error) {
-      console.error("Zego Token Error:", error);
-      alert("⚠️ Could not connect to the secure video server.");
-    }
-  };
+  if (!element || !roomId) return;
+  try {
+    const appID = Number(process.env.REACT_APP_ZEGO_APP_ID);
+    const serverSecret = process.env.REACT_APP_ZEGO_SERVER_SECRET;
+    const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+      appID,
+      serverSecret,
+      roomId,
+      username || "User-" + Date.now(),
+      username || "User"
+    );
+    const zp = ZegoUIKitPrebuilt.create(kitToken);
+    zp.joinRoom({
+      container: element,
+      scenario: { mode: ZegoUIKitPrebuilt.VideoConference },
+      showScreenSharingButton: false,
+      showUserList: false,
+      showRoomDetailsButton: false,
+      showMyCameraToggleButton: true,
+      showMyMicrophoneToggleButton: true,
+      showAudioVideoSettingsButton: false,
+      showLeavingView: false,
+      showLayoutButton: false,
+    });
+  } catch (error) {
+    console.error("Zego Error:", error);
+    alert("Video error: " + error.message);
+  }
+};
 
   if (!joined) {
     return (
@@ -1464,7 +1467,9 @@ function App() {
 
       {showVideo && (
         <div
-          ref={myMeeting}
+          ref={(el) => {
+            if (el) myMeeting(el);
+          }}
           style={{
             width: "350px",
             height: "240px",
@@ -1478,7 +1483,6 @@ function App() {
           }}
         />
       )}
-     
     </div>
   );
 }

@@ -1,10 +1,12 @@
+// compileroutes.js
+
 const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 
 router.post("/execute", async (req, res) => {
   const { code, language, stdin } = req.body;
-
+  
   // Direct mapping for OneCompiler
   const langMap = {
     java: "java",
@@ -37,6 +39,8 @@ router.post("/execute", async (req, res) => {
       },
     ],
   };
+
+  console.log("API Key Length is:", process.env.ONECOMPILER_API_KEY?.length);
   try {
     const response = await axios.post(
       "https://api.onecompiler.com/v1/run",

@@ -1,3 +1,5 @@
+// roomroutes.js
+
 const express = require("express");
 const router = express.Router();
 const Room = require("../models/Room"); // FIXED: Added ../ to look outside 'routes' folder

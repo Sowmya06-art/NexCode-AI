@@ -1,3 +1,5 @@
+// server.js
+
 require("dotenv").config();
 const express = require("express");
 const http = require("http");
@@ -48,22 +50,30 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("user-list-update", roomUsers[roomId]);
   }); // <-- join-room block safely ends here
 
-  // FIX 2: Disconnect is now outside of join-room
-  socket.on("disconnect", () => {
-    const { roomId, username } = socket;
-    
-    if (roomId && username && roomUsers[roomId]) {
-      roomUsers[roomId] = roomUsers[roomId].filter(
-        (user) => user !== username,
-      );
-      io.to(roomId).emit("user-list-update", roomUsers[roomId]);
-      
-      // Clean up the room array if everyone leaves
-      if (roomUsers[roomId].length === 0) {
-        delete roomUsers[roomId];
-      }
+  socket.on("disconnect", async () => {
+  const { roomId, username } = socket;
+
+  if (roomId && username && roomUsers[roomId]) {
+    roomUsers[roomId] = roomUsers[roomId].filter(
+      (user) => user !== username,
+    );
+    io.to(roomId).emit("user-list-update", roomUsers[roomId]);
+
+    // Clean up the room array if everyone leaves
+    if (roomUsers[roomId].length === 0) {
+      delete roomUsers[roomId];
     }
-  });
+
+    // ✅ Remove user from MongoDB on disconnect
+    try {
+      await Room.findByIdAndUpdate(roomId, {
+        $pull: { users: username }
+      });
+    } catch (err) {
+      console.error("Error removing user from DB:", err);
+    }
+  }
+});
 
  // 1. SYNC & SAVE CODE
 socket.on("code-change", async ({ roomId, code, fileName }) => {
