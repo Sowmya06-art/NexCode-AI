@@ -35,7 +35,7 @@ In modern software development, remote collaboration often requires developers t
 
 
 ---
-*Check out the live site here: [NexCode Live Workspace][(https://nexcodeai.vercel.app/)]*   
+*Check out the live site here: [NexCode Live Workspace](https://nexcodeai.vercel.app/)*  
 
 ## 🌱 About the Developer
 I believe the best software is built by people who never stop learning. By approaching code with a beginner's mind, I built NexCode-AI to explore how full-stack MERN technologies come together to turn abstract logic into intuitive, living user experiences.
