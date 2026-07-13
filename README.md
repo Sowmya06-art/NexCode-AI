@@ -32,7 +32,10 @@ In modern software development, remote collaboration often requires developers t
 1. **Native Integration:** By bringing real-time code editing, video conferencing, and AI debugging tools into a single platform, it completely eliminates context switching, allowing developers to maintain their flow state.
 2. **Seamless Pair Programming:** Teams can code together dynamically using CodeMirror and Socket.io while actively discussing logic over high-quality, built-in ZegoCloud video streams—no external links required.
 3. **Instant AI Intelligence:** With the built-in Gemini API, developers can ask questions, debug errors, or generate boilerplate code right alongside their live editor, getting answers exactly where their code lives.
-   
+
+
+---
+*Check out the live site here: [NexCode-AI Live Workspace](https://nexcode-ai.vercel.app)*   
 
 ## 🌱 About the Developer
 I believe the best software is built by people who never stop learning. By approaching code with a beginner's mind, I built NexCode-AI to explore how full-stack MERN technologies come together to turn abstract logic into intuitive, living user experiences.
